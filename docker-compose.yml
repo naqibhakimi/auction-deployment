@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  frontend:
+    container_name: auction-frontend
+    ports:
+      - 80:80
+    image: auction-frontend
+    build:
+      context: frontend
+  backend:
+    container_name: auction-backend
+    ports:
+      - 3000:3000
+    depends_on:
+      - mongodb
+    image: auction-backend
+    build:
+      context: backend
+    restart: always
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      - backend/.env.prod
+    environment:
+      - HOST=0.0.0.0
+  mongodb:
+    container_name: auction-mongodb
+    ports:
+      - 27017:27017
+    image: mongo
+    restart: always
+    volumes:
+      - ./data:/data/db
+    command: mongod --noauth
+
+  mongo-admin:
+    container_name: auction-mongo-admin
+    image: mongo-express
+    ports:
+      - 8081:8081
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+    depends_on:
+      - mongodb
+
+  meilisearch:
+    container_name: auction-meilisearch
+    image: getmeili/meilisearch:v1.0
+    restart: always
+    ports:
+      - 7700:7700
+    env_file:
+      - backend/.env
+    user: '${UID}:${GID}'
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_HTTP_ADDR=meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - ./meili_data:/meili_data
