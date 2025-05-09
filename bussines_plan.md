@@ -67,18 +67,16 @@ To become the leading online auction marketplace in the UAE, known for transpare
    - Future: GCC expansion
 
 ### Competitive Analysis
-Key Competitors:
+
+DOTO(): add only dubai ones online auction only
+Key Competitors:  
 - Emirates Auction
-- Pioneer Auctions
-- OPENLANE
-- Manheim
-- ADESA
-- ACV Auctions
+- Marhaba Auction
 
 Competitive Advantages:
 - Blockchain-verified authenticity
 - Mobile-first platform with AR previews
-- Multilingual support (Arabic, English, Hindi)
+- Multilingual support (Arabic, English)
 - AI-powered condition reports
 - Lower transaction fees
 - Advanced bidding tools
