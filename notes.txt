@@ -1,2 +1,12 @@
 primary color: 3A59D1
 
+
+git submodule update --init --recursive
+
+
+ssh-keygen -t ed25519
+
+
+eval $(ssh-agent) > /dev/null
+ssh-add ~/.ssh/id_backend
+ssh-add ~/.ssh/id_frontend
