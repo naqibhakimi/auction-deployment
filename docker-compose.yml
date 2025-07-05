@@ -43,19 +43,3 @@ services:
       - ME_CONFIG_MONGODB_SERVER=mongodb
     depends_on:
       - mongodb
-
-  meilisearch:
-    container_name: auction-meilisearch
-    image: getmeili/meilisearch:v1.0
-    restart: always
-    ports:
-      - 7700:7700
-    env_file:
-      - backend/.env
-    user: '${UID}:${GID}'
-    environment:
-      - MEILI_HOST=http://meilisearch:7700
-      - MEILI_HTTP_ADDR=meilisearch:7700
-      - MEILI_NO_ANALYTICS=true
-    volumes:
-      - ./meili_data:/meili_data
