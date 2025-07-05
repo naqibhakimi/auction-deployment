@@ -1,0 +1,66 @@
+---
+description: API Design and Database Schema Guidelines
+---
+
+# API Design & Database Guidelines
+
+## API Endpoints Structure
+The backend follows RESTful API patterns:
+
+### Authentication Endpoints
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login  
+- `POST /auth/forgot-password` - Password reset request
+- `POST /auth/reset-password` - Password reset confirmation
+
+### Auction Endpoints
+- `GET /auctions` - List auctions
+- `POST /auctions` - Create auction
+- `POST /auctions/:id/bid` - Place bid
+- `GET /auctions/:id` - Get auction details
+
+### Vehicle Endpoints
+- `GET /vehicles` - List vehicles
+- `POST /vehicles` - Create vehicle
+- `PUT /vehicles/:id` - Update vehicle
+- `DELETE /vehicles/:id` - Delete vehicle
+
+### Dealer Endpoints
+- `GET /dealers` - List dealers
+- `POST /dealers/verify` - Dealer verification
+- `GET /dealers/profile` - Get dealer profile
+
+## Database Schemas
+
+### User Schema
+Key fields in [user.schema.ts](mdc:backend/src/auth/schemas/user.schema.ts):
+- email, password, role (buyer/dealer/admin)
+- verification status, email verification
+- created/updated timestamps
+
+### Vehicle Schema  
+Key fields in [vehicle.schema.ts](mdc:backend/src/vehicle/schemas/vehicle.schema.ts):
+- make, model, year, vin
+- condition, mileage, price
+- images, description
+- dealer reference
+
+### Auction Schema
+Key fields in [auction.schema.ts](mdc:backend/src/auction/schemas/auction.schema.ts):
+- vehicle reference, starting price
+- current bid, bid history
+- start/end dates, status
+
+## API Response Standards
+- Use consistent response structure
+- Include proper HTTP status codes
+- Implement pagination for list endpoints
+- Use DTOs for request/response validation
+- Include error details in failed responses
+
+## Security Considerations
+- JWT token authentication
+- Role-based access control
+- Input validation on all endpoints
+- Rate limiting for API protection
+- CORS configuration for frontend access

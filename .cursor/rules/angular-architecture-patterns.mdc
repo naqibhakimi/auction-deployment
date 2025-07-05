@@ -1,0 +1,400 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.html,frontend/**/*.scss
+description: Angular Frontend Development Guidelines
+---
+
+
+# Angular Service-Store-Component Architecture
+
+## Architecture Overview
+
+The Cars Auction platform follows a clean layered architecture pattern:
+
+```
+Components/Pages → NgRx Signal Stores → Services → HTTP/API
+     ↓                    ↓               ↓         ↓
+   Templates         State Management   Business    Backend
+   User Events       Reactive Data      Logic       APIs
+```
+
+## Service Layer Patterns
+
+### Service Structure & Responsibilities
+Services like [vehicle.service.ts](mdc:frontend/src/app/features/vehicle/services/vehicle.service.ts) handle:
+
+- **HTTP Communication**: API calls to backend endpoints
+- **Data Transformation**: Converting between DTOs and models
+- **Error Handling**: Centralized error management
+- **Business Logic**: Domain-specific operations
+
+```typescript
+@Injectable({
+  providedIn: 'root'
+})
+export class VehicleService {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.API_URL}/vehicles`;
+
+  // CRUD Operations
+  createVehicle(vehicleData: CreateVehicleDto): Observable<Vehicle> {
+    return this.http.post<Vehicle>(this.baseUrl, vehicleData)
+      .pipe(catchError(this.handleError));
+  }
+
+  getAllVehicles(filters: VehicleSearchFilters, page = 1, limit = 20): Observable<VehicleListResponse> {
+    // HTTP params building and API call
+  }
+
+  // Specialized operations
+  addToWatchlist(id: string): Observable<Vehicle> { }
+  uploadVehicleImages(id: string, files: File[]): Observable<Vehicle> { }
+}
+```
+
+### Service Integration Patterns
+
+**Dependency Injection**: Services use modern Angular `inject()` function
+**Error Handling**: Consistent error transformation using `catchError`
+**Type Safety**: Strong typing with interfaces and DTOs
+**Environment Configuration**: API URLs from environment files
+
+## Store Layer Patterns
+
+### Store-Service Integration
+Stores like [vehicle.store.ts](mdc:frontend/src/app/features/vehicle/store/vehicle.store.ts) inject services and orchestrate operations:
+
+```typescript
+export const VehicleStore = signalStore(
+  withState(initialState),
+  withComputed(computedSelectors),
+  withMethods((store, vehicleService = inject(VehicleService)) => ({
+    // Store methods use service methods within rxMethod
+    createVehicle: rxMethod<CreateVehicleDto>(
+      pipe(
+        tap(() => patchState(store, { isUpdating: true, error: null })),
+        switchMap((vehicleData) => {
+          return vehicleService.createVehicle(vehicleData).pipe(
+            tapResponse({
+              next: (vehicle) => {
+                patchState(store, {
+                  vehicles: [...store.vehicles(), vehicle],
+                  currentVehicle: vehicle,
+                  isUpdating: false,
+                  successMessage: 'Vehicle created successfully',
+                });
+              },
+              error: (error) => patchState(store, { 
+                error: error.message, 
+                isUpdating: false 
+              }),
+            })
+          );
+        })
+      )
+    ),
+  }))
+);
+```
+
+### Store Responsibilities
+
+**State Management**: Centralized reactive state using signals
+**Service Orchestration**: Coordinates multiple service calls
+**UI State**: Loading, error, and success message management
+**Data Transformation**: Converting service responses to UI state
+**Computed Values**: Derived state calculations
+**Side Effects**: rxMethod for async operations
+
+### Store Connection Patterns
+
+1. **Service Injection**: `vehicleService = inject(VehicleService)`
+2. **Reactive Operations**: Using `rxMethod` with RxJS operators
+3. **State Updates**: `patchState` for immutable updates
+4. **Error Management**: Consistent error handling across operations
+5. **Loading States**: Multiple loading indicators (isLoading, isUpdating, isUploading)
+
+## Component Layer Patterns
+
+### Component-Store Integration
+Components inject and use stores for reactive data access:
+
+```typescript
+@Component({
+  selector: 'app-vehicle-list',
+  standalone: true,
+  template: `
+    <div class="vehicle-grid">
+      @for (vehicle of vehicleStore.vehicles(); track vehicle._id) {
+        <app-vehicle-card 
+          [vehicle]="vehicle"
+          [isLoading]="vehicleStore.isLoading()"
+          (addToWatchlist)="handleAddToWatchlist($event)"
+        />
+      }
+    </div>
+  `
+})
+export class VehicleListComponent {
+  protected readonly vehicleStore = inject(VehicleStore);
+
+  ngOnInit() {
+    // Initialize data loading
+    this.vehicleStore.loadVehicles({ filters: {} });
+  }
+
+  protected handleAddToWatchlist(vehicleId: string): void {
+    this.vehicleStore.addToWatchlist(vehicleId);
+  }
+}
+```
+
+### Component Responsibilities
+
+**Template Binding**: Reactive data display using signals
+**User Interactions**: Event handling and store method calls
+**Lifecycle Management**: Data initialization and cleanup
+**Navigation**: Route-based data loading
+**Validation**: Form validation and error display
+
+## Data Flow Architecture
+
+### Typical Operation Flow
+
+1. **User Action**: Component method triggered by user interaction
+2. **Store Method**: Component calls store rxMethod
+3. **Service Call**: Store uses injected service for HTTP operation
+4. **API Request**: Service makes HTTP call to backend
+5. **Response Handling**: Service transforms response and handles errors
+6. **State Update**: Store updates reactive state using patchState
+7. **UI Update**: Components automatically react to state changes
+
+### Example: Creating a Vehicle
+
+```typescript
+// 1. Component triggers action
+handleCreateVehicle(vehicleData: CreateVehicleDto): void {
+  this.vehicleStore.createVehicle(vehicleData);
+}
+
+// 2. Store orchestrates operation
+createVehicle: rxMethod<CreateVehicleDto>(
+  pipe(
+    tap(() => patchState(store, { isUpdating: true })),  // 3. Loading state
+    switchMap((data) => vehicleService.createVehicle(data)),  // 4. Service call
+    tapResponse({
+      next: (vehicle) => patchState(store, {  // 5. Success handling
+        vehicles: [...store.vehicles(), vehicle],
+        successMessage: 'Vehicle created successfully'
+      }),
+      error: (error) => patchState(store, {  // 6. Error handling
+        error: error.message,
+        isUpdating: false
+      })
+    })
+  )
+)
+
+// 7. Template automatically updates
+@if (vehicleStore.successMessage()) {
+  <div class="success-message">{{ vehicleStore.successMessage() }}</div>
+}
+```
+
+## Feature Organization Patterns
+
+### File Structure
+```
+vehicle/
+├── components/           # Reusable UI components
+├── pages/               # Route components
+├── services/            # HTTP services
+│   └── vehicle.service.ts
+├── store/               # NgRx Signal stores
+│   └── vehicle.store.ts
+├── models/              # TypeScript interfaces
+├── layouts/             # Feature-specific layouts
+└── vehicle.routes.ts    # Feature routing
+```
+
+### Dependency Flow
+```
+Pages → Store → Service → HTTP
+  ↓       ↓       ↓       ↓
+Components ← State ← Data ← API
+```
+
+## Connection Best Practices
+
+### 1. Service Design
+- **Single Responsibility**: One service per domain/feature
+- **Pure Functions**: Services should be stateless
+- **Error Handling**: Consistent error transformation
+- **Type Safety**: Strong typing for all inputs/outputs
+
+### 2. Store Design
+- **State Centralization**: Feature-level state management
+- **Computed Values**: Derive UI state from base state
+- **Side Effects**: Use rxMethod for all async operations
+- **Immutable Updates**: Always use patchState
+
+### 3. Component Design
+- **Reactive Patterns**: Use signals for data access
+- **Event Handling**: Clean separation of UI and business logic
+- **Lifecycle Management**: Proper initialization and cleanup
+- **Template Optimization**: Use trackBy and OnPush where needed
+
+### 4. Error Handling Chain
+```typescript
+// Service Level
+private handleError(error: any): Observable<never> {
+  return throwError(() => new Error(error.message));
+}
+
+// Store Level
+error: (error: { message: string }) => patchState(store, { 
+  error: error.message, 
+  isLoading: false 
+})
+
+// Component Level
+@if (vehicleStore.error()) {
+  <div class="error-message">{{ vehicleStore.error() }}</div>
+}
+```
+
+### 5. Loading State Management
+```typescript
+// Multiple loading states for different operations
+interface VehicleState {
+  isLoading: boolean;     // For read operations
+  isUpdating: boolean;    // For write operations
+  isUploading: boolean;   // For file uploads
+}
+
+// Component usage
+@if (vehicleStore.isLoading()) {
+  <app-loading-spinner />
+}
+```
+
+## Integration Examples
+
+### Search Implementation
+```typescript
+// Service
+searchVehicles(filters: VehicleFilterDto): Observable<VehicleFilterResponse> {
+  return this.http.get<VehicleFilterResponse>(`${this.baseUrl}/search`, { params })
+    .pipe(catchError(this.handleError));
+}
+
+// Store
+searchVehicles: rxMethod<VehicleFilterDto>(
+  pipe(
+    debounceTime(300),  // Debounce user input
+    distinctUntilChanged(),
+    tap(() => patchState(store, { isLoading: true })),
+    switchMap((filters) => vehicleService.searchVehicles(filters)),
+    tapResponse({
+      next: (response) => patchState(store, {
+        searchResults: response,
+        isLoading: false
+      })
+    })
+  )
+)
+
+// Component
+<input 
+  [ngModel]="searchQuery()"
+  (ngModelChange)="handleSearch($event)"
+  placeholder="Search vehicles..."
+/>
+
+protected handleSearch(query: string): void {
+  this.vehicleStore.searchVehicles({ query });
+}
+```
+
+### File Upload Pattern
+```typescript
+// Service
+uploadVehicleImages(id: string, files: File[]): Observable<Vehicle> {
+  const formData = new FormData();
+  files.forEach(file => formData.append('images', file));
+  return this.http.post<Vehicle>(`${this.baseUrl}/${id}/images`, formData);
+}
+
+// Store
+uploadVehicleImages: rxMethod<{ id: string; files: File[] }>(
+  pipe(
+    tap(() => patchState(store, { isUploading: true, uploadProgress: 0 })),
+    switchMap(({ id, files }) => vehicleService.uploadVehicleImages(id, files)),
+    tapResponse({
+      next: (vehicle) => patchState(store, {
+        currentVehicle: vehicle,
+        isUploading: false,
+        uploadProgress: 100
+      })
+    })
+  )
+)
+
+// Component
+<input 
+  type="file" 
+  multiple 
+  (change)="handleFileUpload($event)"
+  accept="image/*"
+/>
+@if (vehicleStore.isUploading()) {
+  <div class="upload-progress">
+    {{ vehicleStore.uploadProgress() }}%
+  </div>
+}
+```
+
+## Testing Integration
+
+### Service Testing
+```typescript
+describe('VehicleService', () => {
+  let service: VehicleService;
+  let httpMock: HttpTestingController;
+
+  it('should create vehicle', () => {
+    const mockVehicle = { _id: '1', make: 'Toyota' };
+    service.createVehicle(vehicleData).subscribe(result => {
+      expect(result).toEqual(mockVehicle);
+    });
+    
+    const req = httpMock.expectOne(`${baseUrl}`);
+    expect(req.request.method).toBe('POST');
+    req.flush(mockVehicle);
+  });
+});
+```
+
+### Store Testing
+```typescript
+describe('VehicleStore', () => {
+  let store: InstanceType<typeof VehicleStore>;
+  let mockService: jasmine.SpyObj<VehicleService>;
+
+  it('should create vehicle successfully', () => {
+    mockService.createVehicle.and.returnValue(of(mockVehicle));
+    
+    TestBed.runInInjectionContext(() => {
+      store.createVehicle(vehicleData);
+    });
+
+    expect(store.vehicles()).toContain(mockVehicle);
+    expect(store.successMessage()).toBe('Vehicle created successfully');
+  });
+});
+```
+
+This architecture ensures clean separation of concerns, reactive data flow, and maintainable code organization across the Angular frontend application.
+description:
+globs:
+alwaysApply: false
+---

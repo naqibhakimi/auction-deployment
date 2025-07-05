@@ -1,0 +1,548 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.html,frontend/**/*.scss
+description: Angular Frontend Development Guidelines
+---
+
+# Advanced NgRx Signal Store Patterns
+
+## Store Composition Patterns
+
+### Feature Store with Entity Management
+```typescript
+// Base entity store pattern
+export function createEntityStore<T extends { id: string }>() {
+  return signalStore(
+    withState({
+      entities: [] as T[],
+      selectedId: null as string | null,
+      isLoading: false,
+      error: null as string | null,
+    }),
+    withComputed(({ entities, selectedId }) => ({
+      entitiesMap: computed(() => {
+        const map = new Map<string, T>();
+        entities().forEach(entity => map.set(entity.id, entity));
+        return map;
+      }),
+      selectedEntity: computed(() => {
+        const id = selectedId();
+        return id ? entities().find(e => e.id === id) || null : null;
+      }),
+      totalEntities: computed(() => entities().length),
+    })),
+    withMethods((store) => ({
+      selectEntity(id: string | null): void {
+        patchState(store, { selectedId: id });
+      },
+      addEntity(entity: T): void {
+        patchState(store, { 
+          entities: [...store.entities(), entity] 
+        });
+      },
+      updateEntity(id: string, changes: Partial<T>): void {
+        patchState(store, {
+          entities: store.entities().map(entity =>
+            entity.id === id ? { ...entity, ...changes } : entity
+          )
+        });
+      },
+      removeEntity(id: string): void {
+        patchState(store, {
+          entities: store.entities().filter(entity => entity.id !== id),
+          selectedId: store.selectedId() === id ? null : store.selectedId()
+        });
+      },
+    }))
+  );
+}
+```
+
+### Store Composition with Plugins
+```typescript
+// Logging plugin for stores
+export function withLogging() {
+  return (store: any) => {
+    const originalPatchState = patchState;
+    
+    return {
+      ...store,
+      // Intercept state changes for logging
+      logStateChange(operation: string, oldState: any, newState: any): void {
+        console.log(`[${operation}] State changed:`, {
+          from: oldState,
+          to: newState,
+          timestamp: new Date().toISOString()
+        });
+      }
+    };
+  };
+}
+
+// Persistence plugin
+export function withPersistence(key: string) {
+  return (store: any) => ({
+    ...store,
+    saveToStorage(): void {
+      const state = Object.keys(store).reduce((acc, key) => {
+        if (typeof store[key] === 'function' && key.endsWith('()')) {
+          acc[key.slice(0, -2)] = store[key]();
+        }
+        return acc;
+      }, {} as any);
+      localStorage.setItem(key, JSON.stringify(state));
+    },
+    loadFromStorage(): void {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const state = JSON.parse(saved);
+        patchState(store, state);
+      }
+    }
+  });
+}
+```
+
+## Global State Management
+
+### Application State Store
+```typescript
+// Global app state for cross-cutting concerns
+interface AppState {
+  user: User | null;
+  theme: 'light' | 'dark';
+  notifications: Notification[];
+  globalLoading: boolean;
+  appVersion: string;
+}
+
+export const AppStore = signalStore(
+  { providedIn: 'root' },
+  withState<AppState>({
+    user: null,
+    theme: 'light',
+    notifications: [],
+    globalLoading: false,
+    appVersion: '1.0.0',
+  }),
+  withComputed(({ user, notifications }) => ({
+    isAuthenticated: computed(() => user() !== null),
+    unreadNotifications: computed(() => 
+      notifications().filter(n => !n.read).length
+    ),
+    userRole: computed(() => user()?.role || 'guest'),
+  })),
+  withMethods((store, authService = inject(AuthService)) => ({
+    setUser(user: User | null): void {
+      patchState(store, { user });
+    },
+    toggleTheme(): void {
+      patchState(store, { 
+        theme: store.theme() === 'light' ? 'dark' : 'light' 
+      });
+    },
+    addNotification(notification: Notification): void {
+      patchState(store, {
+        notifications: [...store.notifications(), notification]
+      });
+    },
+    markNotificationAsRead(id: string): void {
+      patchState(store, {
+        notifications: store.notifications().map(n =>
+          n.id === id ? { ...n, read: true } : n
+        )
+      });
+    },
+    setGlobalLoading(loading: boolean): void {
+      patchState(store, { globalLoading: loading });
+    }
+  }))
+);
+```
+
+### Feature Store Communication
+```typescript
+// Inter-store communication pattern
+export const VehicleStore = signalStore(
+  withState(initialVehicleState),
+  withComputed(computedSelectors),
+  withMethods((store, appStore = inject(AppStore)) => ({
+    createVehicle: rxMethod<CreateVehicleDto>(
+      pipe(
+        tap(() => {
+          patchState(store, { isUpdating: true });
+          appStore.setGlobalLoading(true);
+        }),
+        switchMap((vehicleData) => {
+          return vehicleService.createVehicle(vehicleData).pipe(
+            tapResponse({
+              next: (vehicle) => {
+                patchState(store, { 
+                  vehicles: [...store.vehicles(), vehicle],
+                  isUpdating: false 
+                });
+                appStore.setGlobalLoading(false);
+                appStore.addNotification({
+                  id: crypto.randomUUID(),
+                  message: 'Vehicle created successfully',
+                  type: 'success',
+                  read: false
+                });
+              },
+              error: (error) => {
+                patchState(store, { 
+                  error: error.message, 
+                  isUpdating: false 
+                });
+                appStore.setGlobalLoading(false);
+                appStore.addNotification({
+                  id: crypto.randomUUID(),
+                  message: error.message,
+                  type: 'error',
+                  read: false
+                });
+              }
+            })
+          );
+        })
+      )
+    ),
+  }))
+);
+```
+
+## Advanced RxJS Patterns
+
+### Debounced Search Implementation
+```typescript
+export const SearchStore = signalStore(
+  withState({
+    query: '',
+    results: [] as SearchResult[],
+    isSearching: false,
+  }),
+  withMethods((store, searchService = inject(SearchService)) => ({
+    // Debounced search method
+    search: rxMethod<string>(
+      pipe(
+        tap((query) => patchState(store, { query })),
+        filter(query => query.length >= 2),
+        debounceTime(300),
+        distinctUntilChanged(),
+        tap(() => patchState(store, { isSearching: true })),
+        switchMap((query) =>
+          searchService.search(query).pipe(
+            tapResponse({
+              next: (results) => patchState(store, { 
+                results, 
+                isSearching: false 
+              }),
+              error: () => patchState(store, { 
+                results: [], 
+                isSearching: false 
+              })
+            })
+          )
+        )
+      )
+    ),
+  }))
+);
+```
+
+### Optimistic Updates Pattern
+```typescript
+export const OptimisticVehicleStore = signalStore(
+  withState(initialState),
+  withMethods((store, vehicleService = inject(VehicleService)) => ({
+    updateVehicleOptimistic: rxMethod<{ id: string; changes: Partial<Vehicle> }>(
+      pipe(
+        tap(({ id, changes }) => {
+          // Optimistic update
+          patchState(store, {
+            vehicles: store.vehicles().map(v => 
+              v.id === id ? { ...v, ...changes } : v
+            )
+          });
+        }),
+        switchMap(({ id, changes }) =>
+          vehicleService.updateVehicle(id, changes).pipe(
+            tapResponse({
+              next: (updatedVehicle) => {
+                // Confirm optimistic update with server response
+                patchState(store, {
+                  vehicles: store.vehicles().map(v => 
+                    v.id === id ? updatedVehicle : v
+                  )
+                });
+              },
+              error: (error) => {
+                // Revert optimistic update on error
+                patchState(store, {
+                  vehicles: store.vehicles().map(v => 
+                    v.id === id ? { ...v, ...changes } : v
+                  ),
+                  error: error.message
+                });
+              }
+            })
+          )
+        )
+      )
+    ),
+  }))
+);
+```
+
+## State Synchronization Patterns
+
+### Real-time Updates with WebSocket
+```typescript
+export const RealtimeAuctionStore = signalStore(
+  withState({
+    auctions: [] as Auction[],
+    connectedUsers: 0,
+    connectionStatus: 'disconnected' as 'connected' | 'disconnected' | 'connecting',
+  }),
+  withMethods((store, websocketService = inject(WebSocketService)) => ({
+    connectToRealtimeUpdates: rxMethod<void>(
+      pipe(
+        tap(() => patchState(store, { connectionStatus: 'connecting' })),
+        switchMap(() =>
+          websocketService.connect('auction-updates').pipe(
+            tapResponse({
+              next: (message: any) => {
+                switch (message.type) {
+                  case 'auction_update':
+                    patchState(store, {
+                      auctions: store.auctions().map(a =>
+                        a.id === message.data.id ? message.data : a
+                      )
+                    });
+                    break;
+                  case 'user_count':
+                    patchState(store, { connectedUsers: message.data.count });
+                    break;
+                  case 'connection_established':
+                    patchState(store, { connectionStatus: 'connected' });
+                    break;
+                }
+              },
+              error: () => patchState(store, { 
+                connectionStatus: 'disconnected' 
+              })
+            })
+          )
+        )
+      )
+    ),
+  }))
+);
+```
+
+### State Hydration from Local Storage
+```typescript
+export function withStateHydration<T>(storageKey: string, initialState: T) {
+  return signalStore(
+    withState(() => {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? { ...initialState, ...JSON.parse(stored) } : initialState;
+    }),
+    withMethods((store) => ({
+      persistState(): void {
+        const stateToSave = Object.keys(store).reduce((acc, key) => {
+          if (typeof store[key] === 'function') {
+            // Extract signal values
+            try {
+              acc[key] = store[key]();
+            } catch {
+              // Skip non-signal functions
+            }
+          }
+          return acc;
+        }, {} as any);
+        
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+      },
+      clearPersistedState(): void {
+        localStorage.removeItem(storageKey);
+      }
+    }))
+  );
+}
+```
+
+## Performance Optimization Patterns
+
+### Lazy Loading with Store Providers
+```typescript
+// Lazy-loaded feature store
+@Injectable()
+export class LazyVehicleStoreProvider {
+  private _store?: InstanceType<typeof VehicleStore>;
+
+  get store() {
+    if (!this._store) {
+      this._store = TestBed.runInInjectionContext(() => VehicleStore());
+    }
+    return this._store;
+  }
+
+  destroy() {
+    this._store = undefined;
+  }
+}
+
+// In component
+@Component({
+  providers: [LazyVehicleStoreProvider],
+  template: `...`
+})
+export class VehicleListComponent implements OnDestroy {
+  private storeProvider = inject(LazyVehicleStoreProvider);
+  
+  store = this.storeProvider.store;
+
+  ngOnDestroy() {
+    this.storeProvider.destroy();
+  }
+}
+```
+
+### Memoization Patterns
+```typescript
+export const MemoizedVehicleStore = signalStore(
+  withState(initialState),
+  withComputed(({ vehicles, filters }) => ({
+    // Expensive computed with memoization
+    filteredVehicles: computed(() => {
+      const vehicleList = vehicles();
+      const currentFilters = filters();
+      
+      if (!currentFilters || Object.keys(currentFilters).length === 0) {
+        return vehicleList;
+      }
+
+      return vehicleList.filter(vehicle => {
+        return Object.entries(currentFilters).every(([key, value]) => {
+          if (!value) return true;
+          return vehicle[key as keyof Vehicle]?.toString()
+            .toLowerCase()
+            .includes(value.toString().toLowerCase());
+        });
+      });
+    }),
+
+    // Group by computed with Map for performance
+    vehiclesByMake: computed(() => {
+      return vehicles().reduce((acc, vehicle) => {
+        const make = vehicle.make;
+        if (!acc.has(make)) {
+          acc.set(make, []);
+        }
+        acc.get(make)!.push(vehicle);
+        return acc;
+      }, new Map<string, Vehicle[]>());
+    }),
+  }))
+);
+```
+
+## Error Recovery Patterns
+
+### Retry Logic with Exponential Backoff
+```typescript
+export const ResilientVehicleStore = signalStore(
+  withState({
+    ...initialState,
+    retryCount: 0,
+    maxRetries: 3,
+  }),
+  withMethods((store, vehicleService = inject(VehicleService)) => ({
+    loadVehiclesWithRetry: rxMethod<LoadVehiclesParams>(
+      pipe(
+        tap(() => patchState(store, { isLoading: true, error: null })),
+        switchMap((params) =>
+          vehicleService.getVehicles(params).pipe(
+            retryWhen(errors =>
+              errors.pipe(
+                scan((retryCount, error) => {
+                  if (retryCount >= store.maxRetries()) {
+                    throw error;
+                  }
+                  return retryCount + 1;
+                }, 0),
+                tap(retryCount => {
+                  patchState(store, { retryCount });
+                }),
+                delay(Math.pow(2, store.retryCount()) * 1000) // Exponential backoff
+              )
+            ),
+            tapResponse({
+              next: (vehicles) => patchState(store, { 
+                vehicles, 
+                isLoading: false, 
+                retryCount: 0 
+              }),
+              error: (error) => patchState(store, { 
+                error: error.message, 
+                isLoading: false 
+              })
+            })
+          )
+        )
+      )
+    ),
+  }))
+);
+```
+
+## Testing Advanced Patterns
+
+### Testing Store Composition
+```typescript
+describe('Store Composition', () => {
+  it('should compose entity management correctly', () => {
+    interface TestEntity { id: string; name: string; }
+    
+    const TestStore = createEntityStore<TestEntity>();
+    const store = TestBed.runInInjectionContext(() => TestStore);
+
+    const entity = { id: '1', name: 'Test' };
+    
+    TestBed.runInInjectionContext(() => {
+      store.addEntity(entity);
+      store.selectEntity(entity.id);
+    });
+
+    expect(store.selectedEntity()).toEqual(entity);
+    expect(store.totalEntities()).toBe(1);
+  });
+});
+```
+
+## Architecture Guidelines
+
+### Store Boundaries
+- **Feature Stores**: Domain-specific state (vehicles, auctions, users)
+- **Global Store**: Cross-cutting concerns (auth, theme, notifications)
+- **Route Stores**: Page-specific state that doesn't persist
+- **Session Stores**: Temporary state with session lifecycle
+
+### State Organization Principles
+1. **Single Responsibility**: Each store manages one domain
+2. **Flat Structure**: Avoid deep nesting in state
+3. **Immutability**: Always use immutable update patterns
+4. **Normalization**: Store entities by ID for efficient lookups
+5. **Derived State**: Use computed for calculated values
+6. **Error Boundaries**: Isolate errors to prevent cascade failures
+
+### Performance Best Practices
+1. **Lazy Loading**: Load stores only when needed
+2. **Memoization**: Use computed for expensive calculations
+3. **Debouncing**: Debounce frequent operations like search
+4. **Optimistic Updates**: Update UI before server confirmation
+5. **Batch Updates**: Group multiple state changes when possible
+description:
+globs:
+alwaysApply: false
+---

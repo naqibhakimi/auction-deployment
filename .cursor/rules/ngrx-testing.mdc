@@ -1,0 +1,449 @@
+# NgRx Signal Store Testing Guidelines
+
+## Testing Setup Patterns
+
+### Basic Store Test Setup
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { FeatureStore } from './feature.store';
+import { FeatureService } from '../services/feature.service';
+
+describe('FeatureStore', () => {
+  let store: InstanceType<typeof FeatureStore>;
+  let httpTestingController: HttpTestingController;
+  let service: FeatureService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        FeatureService,
+      ],
+    });
+
+    httpTestingController = TestBed.inject(HttpTestingController);
+    service = TestBed.inject(FeatureService);
+    store = TestBed.runInInjectionContext(() => FeatureStore());
+  });
+
+  afterEach(() => {
+    httpTestingController.verify();
+  });
+});
+```
+
+### Mock Service Testing Setup
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { FeatureStore } from './feature.store';
+import { FeatureService } from '../services/feature.service';
+import { of, throwError } from 'rxjs';
+
+describe('FeatureStore with Mock Service', () => {
+  let store: InstanceType<typeof FeatureStore>;
+  let mockService: jasmine.SpyObj<FeatureService>;
+
+  beforeEach(() => {
+    const serviceSpy = jasmine.createSpyObj('FeatureService', [
+      'getItems',
+      'createItem',
+      'updateItem',
+      'deleteItem'
+    ]);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: FeatureService, useValue: serviceSpy }
+      ],
+    });
+
+    mockService = TestBed.inject(FeatureService) as jasmine.SpyObj<FeatureService>;
+    store = TestBed.runInInjectionContext(() => FeatureStore());
+  });
+});
+```
+
+## Initial State Testing
+
+### Test Initial State Values
+```typescript
+describe('Initial State', () => {
+  it('should have correct initial state', () => {
+    expect(store.items()).toEqual([]);
+    expect(store.currentItem()).toBeNull();
+    expect(store.isLoading()).toBe(false);
+    expect(store.isUpdating()).toBe(false);
+    expect(store.error()).toBeNull();
+    expect(store.successMessage()).toBeNull();
+    expect(store.searchResults()).toBeNull();
+    expect(store.searchFilters()).toEqual({});
+  });
+
+  it('should have correct computed initial values', () => {
+    expect(store.totalItems()).toBe(0);
+    expect(store.hasItems()).toBe(false);
+    expect(store.isCurrentItemSelected()).toBe(false);
+    expect(store.hasSearchResults()).toBe(false);
+  });
+});
+```
+
+## Testing Computed Selectors
+
+### Test Computed Properties
+```typescript
+describe('Computed Selectors', () => {
+  it('should calculate totalItems correctly', () => {
+    const mockItems = [
+      { id: '1', name: 'Item 1' },
+      { id: '2', name: 'Item 2' },
+    ];
+
+    // Simulate state update
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {} });
+    });
+
+    mockService.getItems.and.returnValue(of({
+      items: mockItems,
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1
+    }));
+
+    expect(store.totalItems()).toBe(2);
+    expect(store.hasItems()).toBe(true);
+  });
+
+  it('should handle currentItem selection', () => {
+    const mockItem = { id: '1', name: 'Selected Item' };
+    
+    // Simulate selecting an item
+    TestBed.runInInjectionContext(() => {
+      store.selectItem(mockItem.id);
+    });
+
+    expect(store.isCurrentItemSelected()).toBe(true);
+    expect(store.currentItem()).toEqual(mockItem);
+  });
+});
+```
+
+## Testing rxMethod Operations
+
+### Test Loading Operations
+```typescript
+describe('Load Operations', () => {
+  it('should load items successfully', () => {
+    const mockResponse = {
+      items: [{ id: '1', name: 'Test Item' }],
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1
+    };
+
+    mockService.getItems.and.returnValue(of(mockResponse));
+
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {}, page: 1, limit: 20 });
+    });
+
+    expect(store.isLoading()).toBe(false);
+    expect(store.items()).toEqual(mockResponse.items);
+    expect(store.error()).toBeNull();
+    expect(mockService.getItems).toHaveBeenCalledWith({}, 1, 20);
+  });
+
+  it('should handle load errors', () => {
+    const errorMessage = 'Failed to load items';
+    mockService.getItems.and.returnValue(throwError(() => ({ message: errorMessage })));
+
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {} });
+    });
+
+    expect(store.isLoading()).toBe(false);
+    expect(store.error()).toBe(errorMessage);
+    expect(store.items()).toEqual([]);
+  });
+
+  it('should set loading state during operation', () => {
+    mockService.getItems.and.returnValue(of({ items: [], total: 0, page: 1, limit: 20, totalPages: 0 }));
+
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {} });
+    });
+
+    // Note: In real tests, you might need to test loading state with fakeAsync/tick
+    expect(store.error()).toBeNull();
+  });
+});
+```
+
+### Test Create Operations
+```typescript
+describe('Create Operations', () => {
+  it('should create item successfully', () => {
+    const newItem = { name: 'New Item', description: 'Test Description' };
+    const createdItem = { id: '1', ...newItem };
+
+    mockService.createItem.and.returnValue(of(createdItem));
+
+    TestBed.runInInjectionContext(() => {
+      store.createItem(newItem);
+    });
+
+    expect(store.isUpdating()).toBe(false);
+    expect(store.items()).toContain(createdItem);
+    expect(store.currentItem()).toEqual(createdItem);
+    expect(store.successMessage()).toBe('Item created successfully');
+    expect(store.error()).toBeNull();
+  });
+
+  it('should handle create errors', () => {
+    const newItem = { name: 'New Item' };
+    const errorMessage = 'Failed to create item';
+
+    mockService.createItem.and.returnValue(throwError(() => ({ message: errorMessage })));
+
+    TestBed.runInInjectionContext(() => {
+      store.createItem(newItem);
+    });
+
+    expect(store.isUpdating()).toBe(false);
+    expect(store.error()).toBe(errorMessage);
+    expect(store.successMessage()).toBeNull();
+  });
+});
+```
+
+## Testing Error Handling
+
+### Test Error State Management
+```typescript
+describe('Error Handling', () => {
+  it('should clear previous errors when starting new operations', () => {
+    // Set initial error state
+    TestBed.runInInjectionContext(() => {
+      store.setError('Previous error');
+    });
+
+    expect(store.error()).toBe('Previous error');
+
+    // Start new operation
+    mockService.getItems.and.returnValue(of({ items: [], total: 0, page: 1, limit: 20, totalPages: 0 }));
+
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {} });
+    });
+
+    expect(store.error()).toBeNull();
+  });
+
+  it('should provide manual error management', () => {
+    const errorMessage = 'Manual error';
+
+    TestBed.runInInjectionContext(() => {
+      store.setError(errorMessage);
+    });
+
+    expect(store.error()).toBe(errorMessage);
+
+    TestBed.runInInjectionContext(() => {
+      store.clearError();
+    });
+
+    expect(store.error()).toBeNull();
+  });
+});
+```
+
+## Testing Success Messages
+
+### Test Success Message Lifecycle
+```typescript
+describe('Success Messages', () => {
+  it('should show and auto-clear success messages', fakeAsync(() => {
+    const newItem = { name: 'Test Item' };
+    const createdItem = { id: '1', ...newItem };
+
+    mockService.createItem.and.returnValue(of(createdItem));
+
+    TestBed.runInInjectionContext(() => {
+      store.createItem(newItem);
+    });
+
+    expect(store.successMessage()).toBe('Item created successfully');
+
+    // Fast-forward time to trigger auto-clear
+    tick(5000);
+
+    expect(store.successMessage()).toBeNull();
+  }));
+
+  it('should manually clear success messages', () => {
+    TestBed.runInInjectionContext(() => {
+      store.createItem({ name: 'Test' });
+    });
+
+    mockService.createItem.and.returnValue(of({ id: '1', name: 'Test' }));
+
+    expect(store.successMessage()).toBeTruthy();
+
+    TestBed.runInInjectionContext(() => {
+      store.clearSuccessMessage();
+    });
+
+    expect(store.successMessage()).toBeNull();
+  });
+});
+```
+
+## Testing Search Functionality
+
+### Test Search Operations
+```typescript
+describe('Search Operations', () => {
+  it('should perform search with filters', () => {
+    const filters = { name: 'test', category: 'electronics' };
+    const searchResponse = {
+      items: [{ id: '1', name: 'Test Item' }],
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+      filters
+    };
+
+    mockService.searchItems.and.returnValue(of(searchResponse));
+
+    TestBed.runInInjectionContext(() => {
+      store.searchItems(filters);
+    });
+
+    expect(store.searchResults()).toEqual(searchResponse);
+    expect(store.searchFilters()).toEqual(filters);
+    expect(store.hasSearchResults()).toBe(true);
+  });
+
+  it('should clear search results', () => {
+    TestBed.runInInjectionContext(() => {
+      store.clearSearchResults();
+    });
+
+    expect(store.searchResults()).toBeNull();
+    expect(store.searchFilters()).toEqual({});
+  });
+});
+```
+
+## Integration Testing
+
+### Test Store with HTTP Interceptors
+```typescript
+describe('Store Integration Tests', () => {
+  it('should handle HTTP requests correctly', () => {
+    TestBed.runInInjectionContext(() => {
+      store.loadItems({ filters: {} });
+    });
+
+    const req = httpTestingController.expectOne('/api/items?page=1&limit=20');
+    expect(req.request.method).toEqual('GET');
+
+    req.flush({
+      items: [{ id: '1', name: 'Test Item' }],
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1
+    });
+
+    expect(store.items().length).toBe(1);
+    expect(store.error()).toBeNull();
+  });
+});
+```
+
+## Performance Testing
+
+### Test Computed Memoization
+```typescript
+describe('Performance', () => {
+  it('should memoize computed selectors', () => {
+    const items = [{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }];
+    
+    // Simulate state update
+    TestBed.runInInjectionContext(() => {
+      // Update items state
+      store.loadItems({ filters: {} });
+    });
+
+    mockService.getItems.and.returnValue(of({
+      items,
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1
+    }));
+
+    const firstCall = store.totalItems();
+    const secondCall = store.totalItems();
+
+    expect(firstCall).toBe(secondCall);
+    expect(firstCall).toBe(2);
+  });
+});
+```
+
+## Testing Utilities
+
+### Custom Testing Helpers
+```typescript
+// test-helpers/store-test.helpers.ts
+export class StoreTestHelpers {
+  static createMockResponse<T>(items: T[], total?: number) {
+    return {
+      items,
+      total: total ?? items.length,
+      page: 1,
+      limit: 20,
+      totalPages: Math.ceil((total ?? items.length) / 20)
+    };
+  }
+
+  static expectLoadingState(store: any, isLoading: boolean) {
+    expect(store.isLoading()).toBe(isLoading);
+    if (isLoading) {
+      expect(store.error()).toBeNull();
+    }
+  }
+
+  static expectErrorState(store: any, errorMessage: string) {
+    expect(store.error()).toBe(errorMessage);
+    expect(store.isLoading()).toBe(false);
+    expect(store.isUpdating()).toBe(false);
+  }
+}
+```
+
+## Best Testing Practices
+
+1. **Test Initial State**: Always verify initial state values
+2. **Test Computed Selectors**: Ensure derived state calculations are correct
+3. **Test Loading States**: Verify loading indicators work properly
+4. **Test Error Handling**: Cover both success and error scenarios
+5. **Test Side Effects**: Verify rxMethod operations work correctly
+6. **Use Mocks**: Mock external dependencies for unit tests
+7. **Test Integration**: Include tests with real HTTP calls
+8. **Performance**: Test computed selector memoization
+9. **Async Operations**: Use fakeAsync/tick for time-dependent operations
+10. **Clean Up**: Always verify HTTP requests in afterEach
+description:
+globs:
+alwaysApply: false
+---

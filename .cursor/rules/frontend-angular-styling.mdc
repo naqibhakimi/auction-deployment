@@ -1,0 +1,105 @@
+---
+globs: frontend/**/*.html,frontend/**/*.ts,frontend/**/*.scss
+description: Angular Frontend Styling Guidelines with Tailwind CSS and PrimeNG
+---
+
+# Angular Frontend Styling Guidelines
+
+## Core Styling Principles
+
+### 1. Tailwind CSS + PrimeNG Only
+- **ONLY** use Tailwind CSS utility classes and PrimeNG components for styling
+- Do **NOT** write custom CSS/SCSS unless absolutely necessary
+- Leverage Tailwind's utility-first approach for spacing, colors, typography, and layout
+
+### 2. PrimeNG Component Priority
+- **ALWAYS** check if a PrimeNG component exists for your UI need before building custom solutions
+- Use PrimeNG components for:
+  - Forms: `p-inputText`, `p-dropdown`, `p-checkbox`, `p-radioButton`, `p-calendar`
+  - Data Display: `p-table`, `p-dataView`, `p-card`, `p-panel`
+  - Navigation: `p-menubar`, `p-breadcrumb`, `p-tabView`, `p-steps`
+  - Feedback: `p-toast`, `p-confirmDialog`, `p-progressBar`, `p-skeleton`
+  - Overlays: `p-dialog`, `p-sidebar`, `p-tooltip`, `p-overlaypanel`
+  - Buttons: `p-button`, `p-splitButton`, `p-toggleButton`
+
+### 3. Color Pattern Consistency
+- Maintain consistent color scheme across the entire application
+- Use predefined color tokens in Tailwind configuration
+- Primary colors should align with the cars auction brand identity
+- Follow this color hierarchy:
+  - **Primary**: Brand colors for main actions and highlights
+  - **Secondary**: Supporting colors for secondary actions
+  - **Success**: Green variants for positive actions
+  - **Warning**: Orange/yellow for caution states
+  - **Danger**: Red variants for destructive actions
+  - **Info**: Blue variants for informational content
+  - **Neutral**: Gray scale for text and backgrounds
+
+### 4. Custom Styles - When Permitted
+Custom styles are **ONLY** allowed when:
+- PrimeNG component doesn't exist for the specific use case
+- Tailwind utilities cannot achieve the desired layout
+- Complex animations or transitions are required
+- Brand-specific styling that cannot be achieved with utilities
+
+When writing custom styles:
+```scss
+// Use CSS custom properties for consistency
+.custom-component {
+  @apply bg-primary-50 text-primary-900; // Prefer Tailwind utilities
+  
+  // Only add custom properties when necessary
+  --custom-property: value;
+}
+```
+
+### 5. Responsive Design
+- Use Tailwind's responsive prefixes: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
+- PrimeNG components are mobile-responsive by default
+- Test on multiple screen sizes
+
+### 6. Component Structure Example
+```html
+<!-- Good: Using PrimeNG + Tailwind -->
+<p-card class="mb-4 shadow-sm">
+  <ng-template pTemplate="header">
+    <div class="flex justify-between items-center p-4">
+      <h2 class="text-xl font-semibold text-gray-800">Vehicle Details</h2>
+      <p-button 
+        icon="pi pi-edit" 
+        severity="secondary" 
+        size="small"
+        class="ml-2">
+      </p-button>
+    </div>
+  </ng-template>
+  
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Make</label>
+      <p-dropdown 
+        [options]="makes" 
+        placeholder="Select Make"
+        optionLabel="name"
+        class="w-full">
+      </p-dropdown>
+    </div>
+  </div>
+</p-card>
+```
+
+### 7. Class Organization
+- Group classes logically: layout → spacing → colors → typography → effects
+- Use Tailwind's class order conventions
+- Example: `flex items-center justify-between p-4 bg-white text-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow`
+
+### 8. Design System Integration
+- Reference the project's design tokens and component library
+- Ensure all styling decisions align with the cars auction platform brand
+- Maintain visual hierarchy and accessibility standards
+
+## Enforcement
+- Code reviews should verify adherence to these guidelines
+- No custom CSS should be merged without justification
+- PrimeNG components should be the first choice for UI elements
+- Color consistency must be maintained across all features

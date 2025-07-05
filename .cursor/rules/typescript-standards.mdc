@@ -1,0 +1,50 @@
+---
+globs: **/*.ts,**/*.tsx
+description: TypeScript Coding Standards and Best Practices
+---
+
+# TypeScript Coding Standards
+
+## General Guidelines
+- Use modern ES6+ syntax always
+- Prefer `const` over `let`, avoid `var`
+- Use arrow functions for callbacks and short functions
+- Implement proper type definitions
+- Use strict TypeScript configuration
+
+## Type Definitions
+- Define interfaces for all data structures
+- Use proper generic types where applicable
+- Avoid `any` type - use proper typing
+- Use union types for constrained values
+- Export types from dedicated `types/` or `models/` folders
+
+## Async Operations
+- Use `async/await` over Promises chains
+- Proper error handling with try-catch
+- Use proper return types for async functions
+
+## Import/Export Standards
+- Use absolute imports where configured
+- Group imports: external libraries, then internal modules
+- Use named exports over default exports for utilities
+- Use barrel exports (index.ts files) for clean imports
+
+## Code Organization
+- One class/interface per file
+- Use meaningful file and variable names
+- Follow consistent naming conventions:
+  - PascalCase for classes, interfaces, types
+  - camelCase for variables, functions, methods
+  - kebab-case for file names
+  - UPPER_SNAKE_CASE for constants
+
+## Documentation
+- Use JSDoc comments for public APIs
+- Document complex business logic
+- Include type information in comments where helpful
+
+## Error Handling
+- Create custom error classes where needed
+- Use proper error types in catch blocks
+- Implement graceful error recovery

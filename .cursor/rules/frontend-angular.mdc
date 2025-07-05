@@ -1,0 +1,55 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.html,frontend/**/*.scss
+description: Angular Frontend Development Guidelines
+---
+
+# Angular Frontend Development Guidelines
+
+## Architecture Patterns
+Follow Angular feature-based architecture:
+- **Features**: Organized by domain in [features/](mdc:frontend/src/app/features/)
+- **Shared**: Reusable components in [shared/](mdc:frontend/src/app/shared/)
+- **Core**: Singleton services in [core/](mdc:frontend/src/app/core/)
+- **Layouts**: Page layouts in [layouts/](mdc:frontend/src/app/layouts/)
+
+## Feature Structure
+Each feature follows this structure:
+```
+feature/
+├── feature.module.ts
+├── feature.routes.ts
+├── components/
+├── pages/
+├── services/
+├── store/
+├── models/
+└── layouts/
+```
+
+## State Management
+Using signal-based stores for state management:
+- Auth store: [auth.store.ts](mdc:frontend/src/app/features/auth/store/auth.store.ts)
+- Admin store: [admin.store.ts](mdc:frontend/src/app/features/admin/store/admin.store.ts)
+- Filter store: [filter.store.ts](mdc:frontend/src/app/store/filter.store.ts)
+
+## Key Services
+- **Authentication**: User auth and token management - [auth.service.ts](mdc:frontend/src/app/features/auth/services/auth.service.ts)
+- **Theme**: Dark/light mode management - [theme.service.ts](mdc:frontend/src/app/core/services/theme.service.ts)
+- **Error Handling**: Global error management - [error.service.ts](mdc:frontend/src/app/core/services/error.service.ts)
+
+## Component Organization
+- **Shared Components**: Reusable UI components like buttons, modals
+- **Feature Components**: Feature-specific components
+- **Layout Components**: Page structure components
+
+## Routing & Guards
+- Feature-based routing with lazy loading
+- Auth guard: [auth.guard.ts](mdc:frontend/src/app/core/guards/auth.guard.ts)
+- Route protection for authenticated areas
+
+## Development Guidelines
+- Use Angular signals for reactive state
+- Implement lazy loading for features
+- Follow Angular style guide conventions
+- Use TypeScript strict mode
+- Implement proper error handling

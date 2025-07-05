@@ -1,0 +1,389 @@
+# Practical Examples: Enhancing Vehicle Store
+
+## Current Vehicle Store Analysis
+
+Your existing `VehicleStore` already demonstrates excellent NgRx Signal Store patterns:
+
+### ✅ Well-Implemented Patterns
+```typescript
+// Current store structure follows best practices
+export const VehicleStore = signalStore(
+  withState(initialState),           // ✅ Clean state interface
+  withComputed(computedSelectors),   // ✅ Comprehensive computed properties
+  withMethods(storeMethods)          // ✅ Consistent rxMethod patterns
+);
+```
+
+### 🚀 Enhancement Opportunities
+
+#### 1. Add Debounced Search (from Advanced Patterns)
+```typescript
+// Current search - immediate
+searchVehicles: rxMethod<VehicleFilterDto>(/*...*/)
+
+// Enhanced with debouncing
+searchVehiclesDebounced: rxMethod<VehicleFilterDto>(
+  pipe(
+    debounceTime(300),           // Wait 300ms after user stops typing
+    distinctUntilChanged(),      // Only search if query changed
+    filter(filters => Object.keys(filters).length > 0),
+    tap(() => patchState(store, { isLoading: true, error: null })),
+    switchMap((filters) => {
+      return vehicleService.searchVehicles(filters).pipe(
+        tapResponse({
+          next: (response) => patchState(store, {
+            searchResults: response,
+            searchFilters: filters,
+            isLoading: false,
+          }),
+          error: (error) => patchState(store, { 
+            error: error.message, 
+            isLoading: false 
+          })
+        })
+      );
+    })
+  )
+)
+```
+
+#### 2. Add Optimistic Updates for Vehicle Status
+```typescript
+// Enhanced vehicle status update with optimistic UI
+updateVehicleStatusOptimistic: rxMethod<{ id: string; status: VehicleStatus }>(
+  pipe(
+    tap(({ id, status }) => {
+      // Optimistic update - immediately update UI
+      patchState(store, {
+        vehicles: store.vehicles().map(v => 
+          v._id === id ? { ...v, status } : v
+        ),
+        currentVehicle: store.currentVehicle()?._id === id 
+          ? { ...store.currentVehicle()!, status }
+          : store.currentVehicle()
+      });
+    }),
+    switchMap(({ id, status }) =>
+      vehicleService.updateVehicleStatus(id, status).pipe(
+        tapResponse({
+          next: (updatedVehicle) => {
+            // Confirm with server response
+            patchState(store, {
+              vehicles: store.vehicles().map(v => 
+                v._id === id ? updatedVehicle : v
+              ),
+              successMessage: 'Vehicle status updated'
+            });
+          },
+          error: (error) => {
+            // Revert optimistic update on error
+            const originalVehicle = store.vehicles().find(v => v._id === id);
+            if (originalVehicle) {
+              patchState(store, {
+                vehicles: store.vehicles().map(v => 
+                  v._id === id ? originalVehicle : v
+                ),
+                error: error.message
+              });
+            }
+          }
+        })
+      )
+    )
+  )
+)
+```
+
+#### 3. Add Entity Management Utilities
+```typescript
+// Enhanced entity management methods
+selectVehicleById(id: string): void {
+  const vehicle = store.vehicles().find(v => v._id === id);
+  patchState(store, { currentVehicle: vehicle || null });
+},
+
+updateVehicleInList(id: string, changes: Partial<Vehicle>): void {
+  patchState(store, {
+    vehicles: store.vehicles().map(v =>
+      v._id === id ? { ...v, ...changes } : v
+    ),
+    currentVehicle: store.currentVehicle()?._id === id
+      ? { ...store.currentVehicle()!, ...changes }
+      : store.currentVehicle()
+  });
+},
+
+removeVehicleFromList(id: string): void {
+  patchState(store, {
+    vehicles: store.vehicles().filter(v => v._id !== id),
+    currentVehicle: store.currentVehicle()?._id === id 
+      ? null 
+      : store.currentVehicle()
+  });
+}
+```
+
+#### 4. Add Retry Logic with Exponential Backoff
+```typescript
+// Enhanced loading with retry logic
+loadVehiclesWithRetry: rxMethod<LoadVehiclesParams>(
+  pipe(
+    tap(() => patchState(store, { isLoading: true, error: null })),
+    switchMap((params) =>
+      vehicleService.getAllVehicles(params.filters, params.page, params.limit).pipe(
+        retryWhen(errors =>
+          errors.pipe(
+            scan((retryCount, error) => {
+              if (retryCount >= 3) {
+                throw error;
+              }
+              return retryCount + 1;
+            }, 0),
+            delay(1000) // Wait 1 second before retry
+          )
+        ),
+        tapResponse({
+          next: (response) => patchState(store, {
+            vehicles: response.vehicles,
+            searchFilters: params.filters,
+            isLoading: false,
+          }),
+          error: (error) => patchState(store, { 
+            error: error.message, 
+            isLoading: false 
+          })
+        })
+      )
+    )
+  )
+)
+```
+
+#### 5. Add State Persistence
+```typescript
+// Add persistence methods to the store
+withMethods((store) => ({
+  // ... existing methods ...
+  
+  persistVehicleFilters(): void {
+    const filters = store.searchFilters();
+    localStorage.setItem('vehicle-search-filters', JSON.stringify(filters));
+  },
+  
+  loadPersistedFilters(): void {
+    const saved = localStorage.getItem('vehicle-search-filters');
+    if (saved) {
+      const filters = JSON.parse(saved);
+      patchState(store, { searchFilters: filters });
+    }
+  },
+  
+  clearPersistedData(): void {
+    localStorage.removeItem('vehicle-search-filters');
+  }
+}))
+```
+
+#### 6. Add Better Error Recovery
+```typescript
+// Enhanced error handling with recovery options
+setError(message: string, recoveryAction?: () => void): void {
+  patchState(store, { 
+    error: message,
+    errorRecoveryAction: recoveryAction
+  });
+},
+
+retryLastOperation(): void {
+  const recoveryAction = store.errorRecoveryAction();
+  if (recoveryAction) {
+    patchState(store, { error: null, errorRecoveryAction: null });
+    recoveryAction();
+  }
+},
+
+clearError(): void {
+  patchState(store, { 
+    error: null, 
+    errorRecoveryAction: null 
+  });
+}
+```
+
+## Testing Enhancements
+
+### Current Testing + New Patterns
+```typescript
+describe('Enhanced Vehicle Store', () => {
+  let store: InstanceType<typeof VehicleStore>;
+  let mockService: jasmine.SpyObj<VehicleService>;
+
+  beforeEach(() => {
+    // Setup from testing guidelines
+    const serviceSpy = jasmine.createSpyObj('VehicleService', [
+      'getAllVehicles', 'searchVehicles', 'updateVehicleStatus'
+    ]);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: VehicleService, useValue: serviceSpy }
+      ],
+    });
+
+    mockService = TestBed.inject(VehicleService) as jasmine.SpyObj<VehicleService>;
+    store = TestBed.runInInjectionContext(() => VehicleStore());
+  });
+
+  // Test debounced search
+  it('should debounce search requests', fakeAsync(() => {
+    const filters = { make: 'Toyota' };
+    mockService.searchVehicles.and.returnValue(of(mockSearchResponse));
+
+    // Trigger multiple rapid searches
+    TestBed.runInInjectionContext(() => {
+      store.searchVehiclesDebounced(filters);
+      store.searchVehiclesDebounced(filters);
+      store.searchVehiclesDebounced(filters);
+    });
+
+    // Should only make one call after debounce period
+    tick(300);
+    
+    expect(mockService.searchVehicles).toHaveBeenCalledTimes(1);
+    expect(mockService.searchVehicles).toHaveBeenCalledWith(filters);
+  }));
+
+  // Test optimistic updates
+  it('should handle optimistic updates with error recovery', () => {
+    const vehicleId = '123';
+    const newStatus = VehicleStatus.SOLD;
+    const vehicle = { _id: vehicleId, status: VehicleStatus.LISTED };
+    
+    // Setup initial state
+    patchState(store, { vehicles: [vehicle] });
+    
+    // Mock service failure
+    mockService.updateVehicleStatus.and.returnValue(
+      throwError(() => ({ message: 'Update failed' }))
+    );
+
+    TestBed.runInInjectionContext(() => {
+      store.updateVehicleStatusOptimistic({ id: vehicleId, status: newStatus });
+    });
+
+    // Should revert optimistic update
+    expect(store.vehicles()[0].status).toBe(VehicleStatus.LISTED);
+    expect(store.error()).toBe('Update failed');
+  });
+});
+```
+
+## Performance Optimizations
+
+### Enhanced Computed Selectors
+```typescript
+withComputed(({ vehicles, searchFilters }) => ({
+  // Memoized expensive calculations
+  vehiclesByMake: computed(() => {
+    return vehicles().reduce((acc, vehicle) => {
+      const make = vehicle.make;
+      if (!acc.has(make)) {
+        acc.set(make, []);
+      }
+      acc.get(make)!.push(vehicle);
+      return acc;
+    }, new Map<string, Vehicle[]>());
+  }),
+
+  // Filtered vehicles with better performance
+  filteredVehicles: computed(() => {
+    const vehicleList = vehicles();
+    const filters = searchFilters();
+    
+    if (!filters || Object.keys(filters).length === 0) {
+      return vehicleList;
+    }
+
+    return vehicleList.filter(vehicle => {
+      return Object.entries(filters).every(([key, value]) => {
+        if (!value) return true;
+        const vehicleValue = vehicle[key as keyof Vehicle];
+        return vehicleValue?.toString()
+          .toLowerCase()
+          .includes(value.toString().toLowerCase());
+      });
+    });
+  }),
+
+  // Price range statistics
+  priceStats: computed(() => {
+    const prices = vehicles()
+      .map(v => v.financial.askingPrice)
+      .filter(price => price > 0);
+    
+    if (prices.length === 0) return null;
+    
+    const sorted = [...prices].sort((a, b) => a - b);
+    return {
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      average: prices.reduce((sum, price) => sum + price, 0) / prices.length,
+      median: sorted[Math.floor(sorted.length / 2)]
+    };
+  })
+}))
+```
+
+## Integration with Global State
+
+### Connect to App Store
+```typescript
+withMethods((store, appStore = inject(AppStore)) => ({
+  createVehicle: rxMethod<CreateVehicleDto>(
+    pipe(
+      tap(() => {
+        patchState(store, { isUpdating: true });
+        appStore.setGlobalLoading(true);
+      }),
+      switchMap((vehicleData) => {
+        return vehicleService.createVehicle(vehicleData).pipe(
+          tapResponse({
+            next: (vehicle) => {
+              patchState(store, {
+                vehicles: [...store.vehicles(), vehicle],
+                isUpdating: false
+              });
+              appStore.setGlobalLoading(false);
+              appStore.addNotification({
+                id: crypto.randomUUID(),
+                message: 'Vehicle created successfully',
+                type: 'success',
+                read: false
+              });
+            },
+            error: (error) => {
+              patchState(store, { 
+                error: error.message, 
+                isUpdating: false 
+              });
+              appStore.setGlobalLoading(false);
+              appStore.addNotification({
+                id: crypto.randomUUID(),
+                message: error.message,
+                type: 'error',
+                read: false
+              });
+            }
+          })
+        );
+      })
+    )
+  )
+}))
+```
+
+These enhancements build upon your excellent existing implementation while adding advanced patterns for better user experience, error handling, and performance.
+description:
+globs:
+alwaysApply: false
+---

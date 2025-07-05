@@ -1,0 +1,49 @@
+---
+globs: backend/**/*.ts
+description: NestJS Backend Development Guidelines
+---
+
+# NestJS Backend Development Guidelines
+
+## Architecture Patterns
+Follow the standard NestJS module structure:
+- **Controllers**: Handle HTTP requests and responses
+- **Services**: Contain business logic
+- **DTOs**: Data Transfer Objects for validation - located in `dto/` folders
+- **Schemas**: Mongoose schemas for MongoDB - located in `schemas/` folders
+- **Guards**: Authentication and authorization - [guards/](mdc:backend/src/auth/guards/)
+- **Decorators**: Custom decorators - [decorators/](mdc:backend/src/auth/decorators/)
+
+## Module Organization
+Each feature follows this structure:
+```
+feature/
+├── feature.controller.ts
+├── feature.service.ts
+├── feature.module.ts
+├── dto/
+│   └── *.dto.ts
+├── schemas/
+│   └── *.schema.ts
+└── types/
+    └── *.types.ts
+```
+
+## Key Backend Services
+- **Authentication**: JWT-based auth with role-based access control
+- **Security**: Rate limiting, CORS, validation - [security/](mdc:backend/src/common/security/)
+- **Logging**: Comprehensive logging system - [logging/](mdc:backend/src/common/logging/)
+- **Email**: Email service for notifications - [email/](mdc:backend/src/email/)
+
+## Database Schemas
+MongoDB schemas are defined using Mongoose in `schemas/` folders:
+- User schema: [user.schema.ts](mdc:backend/src/auth/schemas/user.schema.ts)
+- Vehicle schema: [vehicle.schema.ts](mdc:backend/src/vehicle/schemas/vehicle.schema.ts)
+- Auction schema: [auction.schema.ts](mdc:backend/src/auction/schemas/auction.schema.ts)
+
+## Development Guidelines
+- Use dependency injection for services
+- Implement proper error handling with custom exceptions
+- Use DTOs for request validation
+- Follow role-based access control patterns
+- Use guards for route protection

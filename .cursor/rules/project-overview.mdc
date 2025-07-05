@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+description: Cars Auction Project Overview and Architecture
+---
+
+# Cars Auction Platform - Project Overview
+
+This is a full-stack cars auction platform with the following architecture:
+
+## Project Structure
+- **Backend**: NestJS with TypeScript located in [backend/](mdc:backend/)
+- **Frontend**: Angular with TypeScript located in [frontend/](mdc:frontend/)
+- **Database**: MongoDB with Mongoose schemas
+- **Package Manager**: Use `bun` instead of npm/npx for all operations
+
+## Core Modules & Features
+
+### Backend Modules ([backend/src/](mdc:backend/src/))
+- **Authentication**: User registration, login, JWT auth - [auth/](mdc:backend/src/auth/)
+- **Auctions**: Auction creation and bidding system - [auction/](mdc:backend/src/auction/)
+- **Dealers**: Dealer profiles and verification - [dealers/](mdc:backend/src/dealers/)
+- **Vehicles**: Vehicle management and listings - [vehicle/](mdc:backend/src/vehicle/)
+- **Marketplace**: Vehicle marketplace listings - [marketplace/](mdc:backend/src/marketplace/)
+- **Admin**: Admin panel and user management - [admin/](mdc:backend/src/admin/)
+- **Profile**: User profile management and KYC - [profile/](mdc:backend/src/profile/)
+
+### Frontend Features ([frontend/src/app/features/](mdc:frontend/src/app/features/))
+- **Authentication**: Sign in/up, password reset - [auth/](mdc:frontend/src/app/features/auth/)
+- **Admin Panel**: User management, collaborator invites - [admin/](mdc:frontend/src/app/features/admin/)
+- **Dealer Dashboard**: Dealer-specific functionality - [dealer/](mdc:frontend/src/app/features/dealer/)
+- **Profile Management**: User profiles and settings - [profile/](mdc:frontend/src/app/features/profile/)
+- **Vehicle Management**: Vehicle listings and management - [vehicle/](mdc:frontend/src/app/features/vehicle/)
+
+## Key Configuration Files
+- Backend: [package.json](mdc:backend/package.json), [tsconfig.json](mdc:backend/tsconfig.json)
+- Frontend: [package.json](mdc:frontend/package.json), [angular.json](mdc:frontend/angular.json)
+- Docker: [docker-compose.yml](mdc:docker-compose.yml)
+
+## Development Standards
+- Use modern ES6+ syntax for JavaScript/TypeScript
+- Follow NestJS patterns for backend development
+- Follow Angular best practices for frontend development
+- Use `bun` as the package manager instead of npm

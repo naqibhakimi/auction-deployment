@@ -1,0 +1,358 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.html,frontend/**/*.scss
+description: Angular Frontend Development Guidelines
+---
+
+# NgRx Signal Store Implementation Guidelines
+
+## Core Principles
+
+Follow these established patterns for NgRx Signal Store implementation in the cars auction platform:
+
+### Store Structure Pattern
+Each store should follow this consistent structure:
+```typescript
+export const FeatureStore = signalStore(
+  withState(initialState),
+  withComputed(computedSelectors),
+  withMethods(storeMethods)
+);
+```
+
+### State Interface Definition
+- Define clear TypeScript interfaces for state
+- Include loading states, error handling, and success messages
+- Use consistent naming patterns across stores
+
+```typescript
+interface FeatureState {
+  // Data properties
+  items: Item[];
+  currentItem: Item | null;
+  
+  // Meta properties
+  isLoading: boolean;
+  isUpdating: boolean;
+  error: string | null;
+  successMessage: string | null;
+  
+  // Search/filter properties
+  searchResults: SearchResults | null;
+  searchFilters: SearchFilters;
+}
+```
+
+## Computed Selectors Pattern
+
+Use `withComputed` for derived state and memoized selectors:
+
+```typescript
+withComputed(({ items, currentItem, searchResults }) => ({
+  // Count selectors
+  totalItems: computed(() => items().length),
+  hasItems: computed(() => items().length > 0),
+  
+  // Current item selectors
+  isCurrentItemSelected: computed(() => currentItem() !== null),
+  
+  // Search selectors
+  searchResultsCount: computed(() => searchResults()?.total ?? 0),
+  hasSearchResults: computed(() => (searchResults()?.items?.length ?? 0) > 0),
+}))
+```
+
+## Methods Pattern with rxMethod
+
+### Standard CRUD Operations
+Implement consistent patterns for Create, Read, Update, Delete operations:
+
+```typescript
+withMethods((store, service = inject(FeatureService)) => ({
+  // Create operation
+  createItem: rxMethod<CreateItemDto>(
+    pipe(
+      tap(() => patchState(store, { isUpdating: true, error: null })),
+      switchMap((itemData) => {
+        return service.createItem(itemData).pipe(
+          tapResponse({
+            next: (item) => {
+              patchState(store, {
+                items: [...store.items(), item],
+                currentItem: item,
+                isUpdating: false,
+                successMessage: 'Item created successfully',
+              });
+              // Auto-clear success message
+              setTimeout(() => patchState(store, { successMessage: null }), 5000);
+            },
+            error: (error: { message: string }) => patchState(store, { 
+              error: error.message, 
+              isUpdating: false 
+            }),
+            finalize: () => patchState(store, { isUpdating: false }),
+          })
+        );
+      })
+    )
+  ),
+
+  // Load operation with pagination
+  loadItems: rxMethod<{ filters?: FilterDto; page?: number; limit?: number }>(
+    pipe(
+      tap(() => patchState(store, { isLoading: true, error: null })),
+      switchMap(({ filters = {}, page = 1, limit = 20 }) => {
+        return service.getItems(filters, page, limit).pipe(
+          tapResponse({
+            next: (response) => {
+              patchState(store, {
+                items: response.items,
+                searchFilters: filters,
+                isLoading: false,
+              });
+            },
+            error: (error: { message: string }) => patchState(store, { 
+              error: error.message, 
+              isLoading: false 
+            }),
+            finalize: () => patchState(store, { isLoading: false }),
+          })
+        );
+      })
+    )
+  ),
+}))
+```
+
+## Error Handling Patterns
+
+### Consistent Error State Management
+- Always clear previous errors when starting new operations
+- Use descriptive error messages from API responses
+- Implement proper error recovery
+
+```typescript
+// Error handling in rxMethod
+tapResponse({
+  next: (data) => {
+    patchState(store, {
+      // success state updates
+      error: null, // Clear previous errors
+    });
+  },
+  error: (error: { message: string }) => patchState(store, { 
+    error: error.message || 'An unexpected error occurred',
+    isLoading: false,
+    isUpdating: false,
+  }),
+  finalize: () => patchState(store, { 
+    isLoading: false,
+    isUpdating: false,
+  }),
+})
+```
+
+### Manual Error Management Methods
+```typescript
+// Utility methods for error handling
+clearError(): void {
+  patchState(store, { error: null });
+},
+
+setError(message: string): void {
+  patchState(store, { error: message });
+},
+
+clearSuccessMessage(): void {
+  patchState(store, { successMessage: null });
+}
+```
+
+## Loading State Management
+
+### Multiple Loading States
+Use specific loading states for different operations:
+- `isLoading`: For read operations (GET requests)
+- `isUpdating`: For write operations (POST, PUT, DELETE)
+- `isUploading`: For file upload operations
+
+### Loading State Pattern
+```typescript
+// Start operation
+tap(() => patchState(store, { isLoading: true, error: null })),
+
+// End operation (success or error)
+finalize: () => patchState(store, { isLoading: false }),
+```
+
+## Service Integration Patterns
+
+### Dependency Injection
+Use Angular's `inject()` function within `withMethods`:
+```typescript
+withMethods((store, service = inject(FeatureService)) => ({
+  // methods using the injected service
+}))
+```
+
+### API Response Handling
+Handle different API response structures consistently:
+```typescript
+// List responses with pagination
+next: (response: ListResponse<Item>) => {
+  patchState(store, {
+    items: response.items,
+    searchResults: {
+      items: response.items,
+      total: response.total,
+      page: response.page,
+      limit: response.limit,
+      totalPages: response.totalPages,
+    },
+    isLoading: false,
+  });
+}
+```
+
+## Advanced Patterns
+
+### Search and Filtering
+Implement consistent search patterns:
+```typescript
+searchItems: rxMethod<SearchFilters>(
+  pipe(
+    tap(() => patchState(store, { isLoading: true, error: null })),
+    switchMap((filters) => {
+      return service.searchItems(filters).pipe(
+        tapResponse({
+          next: (response) => {
+            patchState(store, {
+              searchResults: response,
+              searchFilters: filters,
+              isLoading: false,
+            });
+          },
+          error: (error) => patchState(store, { 
+            error: error.message, 
+            isLoading: false 
+          }),
+        })
+      );
+    })
+  )
+),
+```
+
+### State Reset Methods
+Provide methods to reset store state:
+```typescript
+resetStore(): void {
+  patchState(store, initialState);
+},
+
+clearSearchResults(): void {
+  patchState(store, { 
+    searchResults: null, 
+    searchFilters: {} 
+  });
+}
+```
+
+## Testing Guidelines
+
+### Store Testing Pattern
+```typescript
+describe('FeatureStore', () => {
+  let store: InstanceType<typeof FeatureStore>;
+  let service: jasmine.SpyObj<FeatureService>;
+
+  beforeEach(() => {
+    const serviceSpyObj = jasmine.createSpyObj('FeatureService', ['getItems', 'createItem']);
+    
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: FeatureService, useValue: serviceSpyObj }
+      ]
+    });
+    
+    service = TestBed.inject(FeatureService) as jasmine.SpyObj<FeatureService>;
+    store = TestBed.runInInjectionContext(() => FeatureStore());
+  });
+
+  it('should have initial state', () => {
+    expect(store.items()).toEqual([]);
+    expect(store.isLoading()).toBe(false);
+    expect(store.error()).toBeNull();
+  });
+});
+```
+
+## File Organization
+
+### Store File Structure
+```
+feature/
+├── store/
+│   ├── index.ts          // Barrel exports
+│   └── feature.store.ts  // Store implementation
+├── models/
+│   ├── index.ts          // Model exports
+│   ├── feature.model.ts  // Entity models
+│   └── feature.state.ts  // State interfaces
+└── services/
+    └── feature.service.ts
+```
+
+### Barrel Export Pattern
+Export stores through index files for clean imports:
+```typescript
+// store/index.ts
+export { FeatureStore } from './feature.store';
+export type { FeatureState } from '../models';
+```
+
+## Import Organization
+
+### Required Imports Order
+```typescript
+// Angular core
+import { computed, inject } from '@angular/core';
+// RxJS
+import { pipe, switchMap, tap } from 'rxjs';
+// NgRx Signals
+import {
+  patchState,
+  signalStore,
+  withComputed,
+  withMethods,
+  withState,
+} from '@ngrx/signals';
+import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { tapResponse } from '@ngrx/operators';
+// Services
+import { FeatureService } from '../services';
+// Models
+import { FeatureState, FeatureModel } from '../models';
+```
+
+## Performance Considerations
+
+- Use computed signals for derived state to avoid unnecessary recalculations
+- Implement proper memoization with computed selectors
+- Use `trackBy` functions with computed arrays in templates
+- Consider pagination for large datasets
+- Implement debouncing for search operations when needed
+
+## Best Practices Summary
+
+1. **Consistency**: Follow established patterns across all stores
+2. **Type Safety**: Define proper TypeScript interfaces for all state
+3. **Error Handling**: Implement comprehensive error management
+4. **Loading States**: Use specific loading states for different operations
+5. **Success Feedback**: Provide user feedback for successful operations
+6. **State Management**: Keep state flat and normalized when possible
+7. **Side Effects**: Use rxMethod for all asynchronous operations
+8. **Testing**: Write comprehensive tests for store methods and computed selectors
+description:
+globs:
+alwaysApply: false
+---
