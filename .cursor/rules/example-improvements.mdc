@@ -1,3 +1,8 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.component.ts
+description: Angular Component File Structure Guidelines
+---
+
 # Practical Examples: Enhancing Vehicle Store
 
 ## Current Vehicle Store Analysis

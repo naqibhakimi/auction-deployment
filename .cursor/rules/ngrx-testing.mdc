@@ -1,3 +1,9 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.component.ts
+description: Angular Component File Structure Guidelines
+---
+
+
 # NgRx Signal Store Testing Guidelines
 
 ## Testing Setup Patterns

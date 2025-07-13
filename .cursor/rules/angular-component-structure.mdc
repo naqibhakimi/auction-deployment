@@ -1,0 +1,224 @@
+---
+globs: frontend/**/*.ts,frontend/**/*.component.ts
+description: Angular Component File Structure Guidelines
+---
+
+# Angular Component File Structure Guidelines
+
+## Mandatory Component File Structure
+
+All Angular components MUST follow the three-file structure pattern:
+
+### Required Files for Each Component
+```
+component-name/
+├── component-name.component.ts      # Component logic
+├── component-name.component.html    # Template
+└── component-name.component.scss    # Styles
+```
+
+### Component Decorator Configuration
+Components MUST use external files for templates and styles:
+
+```typescript
+@Component({
+  selector: 'app-component-name',
+  standalone: true,
+  templateUrl: './component-name.component.html',    // REQUIRED: External template
+  styleUrls: ['./component-name.component.scss'],    // REQUIRED: External styles
+  imports: [CommonModule, /* other imports */]
+})
+export class ComponentNameComponent {
+  // Component logic here
+}
+```
+
+## Prohibited Patterns
+
+### ❌ DO NOT use inline templates
+```typescript
+// WRONG - Inline template
+@Component({
+  selector: 'app-example',
+  template: `<div>Content here</div>`,  // ❌ Forbidden
+  styleUrls: ['./example.component.scss']
+})
+```
+
+### ❌ DO NOT use inline styles
+```typescript
+// WRONG - Inline styles
+@Component({
+  selector: 'app-example',
+  templateUrl: './example.component.html',
+  styles: [`                             // ❌ Forbidden
+    .container { 
+      padding: 1rem; 
+    }
+  `]
+})
+```
+
+### ❌ DO NOT use mixed inline/external patterns
+```typescript
+// WRONG - Mixed approach
+@Component({
+  selector: 'app-example',
+  template: `<div>Content</div>`,        // ❌ Forbidden
+  styleUrls: ['./example.component.scss']
+})
+```
+
+## File Naming Conventions
+
+### Component Files
+- **TypeScript**: `component-name.component.ts`
+- **Template**: `component-name.component.html`
+- **Styles**: `component-name.component.scss`
+
+### Directory Structure
+Components should be organized in dedicated directories:
+```
+src/app/
+├── features/
+│   └── feature-name/
+│       ├── components/
+│       │   └── component-name/
+│       │       ├── component-name.component.ts
+│       │       ├── component-name.component.html
+│       │       └── component-name.component.scss
+│       └── pages/
+│           └── page-name/
+│               ├── page-name.component.ts
+│               ├── page-name.component.html
+│               └── page-name.component.scss
+└── shared/
+    └── components/
+        └── shared-component/
+            ├── shared-component.component.ts
+            ├── shared-component.component.html
+            └── shared-component.component.scss
+```
+
+## Style File Requirements
+
+### SCSS Usage
+- Use `.scss` extension (not `.css`)
+- Leverage SCSS features like variables, mixins, and nesting
+- Follow component-scoped styling principles
+
+### Component-Scoped Styling
+```scss
+// component-name.component.scss
+:host {
+  display: block;
+  
+  .container {
+    padding: 1rem;
+    
+    &__header {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+  }
+}
+```
+
+## Template File Requirements
+
+### HTML Template Structure
+```html
+<!-- component-name.component.html -->
+<div class="container">
+  <header class="container__header">
+    <h2>{{ title }}</h2>
+  </header>
+  
+  <main class="container__content">
+    <ng-content></ng-content>
+  </main>
+</div>
+```
+
+### Template Best Practices
+- Use semantic HTML elements
+- Implement proper accessibility attributes
+- Use Angular control flow (`@if`, `@for`, `@switch`)
+- Follow Angular template syntax conventions
+
+## Angular CLI Generation
+
+### Correct CLI Commands
+Generate components with separate files:
+```bash
+# This creates the correct three-file structure
+ng generate component feature-name/components/component-name
+
+# For standalone components (preferred)
+ng generate component feature-name/components/component-name --standalone
+```
+
+### Verify Generated Structure
+Ensure the generated component has:
+- ✅ `templateUrl` pointing to `.html` file
+- ✅ `styleUrls` array with `.scss` file
+- ✅ Three separate files in component directory
+
+## Component Examples
+
+### Correct Implementation
+```typescript
+// vehicle-card.component.ts
+@Component({
+  selector: 'app-vehicle-card',
+  standalone: true,
+  templateUrl: './vehicle-card.component.html',
+  styleUrls: ['./vehicle-card.component.scss'],
+  imports: [CommonModule, RouterModule]
+})
+export class VehicleCardComponent {
+  @Input() vehicle!: Vehicle;
+  @Input() isLoading = false;
+  @Output() addToWatchlist = new EventEmitter<string>();
+}
+```
+
+### Existing Examples in Codebase
+Reference these correctly structured components:
+- Header: [header.component.ts](mdc:frontend/src/app/layouts/header/header.component.ts)
+- Home: [home.component.ts](mdc:frontend/src/app/pages/home/home.component.ts)
+- Main Layout: [main-layout.component.ts](mdc:frontend/src/app/layouts/main-layout/main-layout.component.ts)
+
+## Benefits of Separate Files
+
+### Code Organization
+- **Separation of Concerns**: Logic, presentation, and styling in separate files
+- **Maintainability**: Easier to locate and modify specific aspects
+- **Readability**: Cleaner, more focused files
+
+### Developer Experience
+- **IDE Support**: Better syntax highlighting and IntelliSense
+- **Version Control**: Cleaner diffs and easier conflict resolution
+- **Team Collaboration**: Multiple developers can work on different aspects
+
+### Performance
+- **Template Compilation**: Better template optimization
+- **Style Encapsulation**: Proper CSS scoping and optimization
+- **Code Splitting**: More efficient bundling and loading
+
+## Enforcement
+
+### Code Review Checklist
+- [ ] Component has separate `.ts`, `.html`, and `.scss` files
+- [ ] No inline templates or styles in `@Component` decorator
+- [ ] Proper file naming convention followed
+- [ ] Component directory structure is correct
+- [ ] SCSS file uses component-scoped styling with `:host`
+
+### Automated Checks
+Consider adding ESLint rules to enforce this pattern:
+- Disallow inline templates
+- Disallow inline styles
+- Require external file references
+
+This structure ensures consistency, maintainability, and follows Angular best practices across the entire codebase.

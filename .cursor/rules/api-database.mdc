@@ -1,5 +1,6 @@
 ---
-description: API Design and Database Schema Guidelines
+globs: backend/**/*.ts
+description: NestJS Backend Development Guidelines
 ---
 
 # API Design & Database Guidelines
