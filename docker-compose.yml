@@ -10,6 +10,9 @@ services:
       context: frontend
     depends_on:
       - backend
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
   backend:
     container_name: auction-backend
     ports:
