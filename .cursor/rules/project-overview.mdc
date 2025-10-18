@@ -5,39 +5,415 @@ description: Cars Auction Project Overview and Architecture
 
 # Cars Auction Platform - Project Overview
 
-This is a full-stack cars auction platform with the following architecture:
+This is a full-stack vehicle auction and marketplace platform inspired by **OpenLane.com**, designed to revolutionize the automotive auction industry in Dubai by connecting dealers, leasing companies, and buyers through an innovative, AI-powered digital marketplace.
+
+## Business Context
+
+**Mission**: Create the most trusted and efficient digital marketplace for vehicle auctions in Dubai, leveraging cutting-edge technology to provide transparency, convenience, and value to all stakeholders in the automotive industry.
+
+**Target Market**:
+- **Dealers**: Large franchise dealers, independent dealers, used car specialists, luxury car dealers
+- **Leasing Companies**: Corporate fleet managers, leasing agencies, financial institutions
+- **Buyers**: Affluent individuals, expatriates, professional buyers, collectors, enthusiasts
+
+**Key Differentiators** (vs. Emirates Auction, Marhaba Auction):
+- Advanced AI-powered condition reports
+- Blockchain-verified authenticity
+- Lower transaction fees (5-10% commission)
+- 24/7 marketplace availability
+- Advanced bidding tools (Ultimo, Price Barometer, Bid Agent)
+- Mobile-first platform with AR vehicle previews
+- Multilingual support (Arabic, English, Hindi)
 
 ## Project Structure
+
 - **Backend**: NestJS with TypeScript located in [backend/](mdc:backend/)
-- **Frontend**: Angular with TypeScript located in [frontend/](mdc:frontend/)
+- **Frontend**: Angular 20 with TypeScript, PrimeNG, TailwindCSS located in [frontend/](mdc:frontend/)
 - **Database**: MongoDB with Mongoose schemas
 - **Package Manager**: Use `bun` instead of npm/npx for all operations
+- **Task Automation**: Trigger.dev for scheduled jobs and background tasks
+- **File Uploads**: Multer with local storage in [backend/uploads/](mdc:backend/uploads/)
+- **Search**: MeiliSearch for fast vehicle search capabilities
+- **Containerization**: Docker Compose setup in [docker-compose.yml](mdc:docker-compose.yml)
+
+## Technology Stack
+
+### Backend ([backend/](mdc:backend/))
+- **Framework**: NestJS 10 with Express
+- **Language**: TypeScript 5.1+
+- **Database**: MongoDB via Mongoose
+- **Authentication**: JWT (JSON Web Tokens) with Passport.js
+- **Security**: Helmet, CSRF protection, rate limiting, bcrypt password hashing
+- **Email**: Nodemailer for transactional emails
+- **Logging**: Winston with daily rotate file strategy
+- **Scheduling**: @nestjs/schedule for cron jobs
+- **Task Queue**: Trigger.dev for background processing
+- **Validation**: class-validator and class-transformer
+- **API Documentation**: Swagger (if configured)
+
+### Frontend ([frontend/](mdc:frontend/))
+- **Framework**: Angular 20 with SSR (Server-Side Rendering)
+- **Language**: TypeScript 5.8+
+- **State Management**: NgRx Signals Store
+- **UI Components**: PrimeNG 19 with custom theming
+- **Styling**: TailwindCSS 4 with @tailwindcss/forms
+- **Icons**: PrimeIcons 7
+- **HTTP Client**: Angular HttpClient with RxJS 7.8
+- **Routing**: Angular Router with lazy loading
+- **Forms**: Reactive Forms with validation
 
 ## Core Modules & Features
 
 ### Backend Modules ([backend/src/](mdc:backend/src/))
-- **Authentication**: User registration, login, JWT auth - [auth/](mdc:backend/src/auth/)
-- **Auctions**: Auction creation and bidding system - [auction/](mdc:backend/src/auction/)
-- **Dealers**: Dealer profiles and verification - [dealers/](mdc:backend/src/dealers/)
-- **Vehicles**: Vehicle management and listings - [vehicle/](mdc:backend/src/vehicle/)
-- **Marketplace**: Vehicle marketplace listings - [marketplace/](mdc:backend/src/marketplace/)
-- **Admin**: Admin panel and user management - [admin/](mdc:backend/src/admin/)
-- **Profile**: User profile management and KYC - [profile/](mdc:backend/src/profile/)
 
-### Frontend Features ([frontend/src/app/features/](mdc:frontend/src/app/features/))
-- **Authentication**: Sign in/up, password reset - [auth/](mdc:frontend/src/app/features/auth/)
-- **Admin Panel**: User management, collaborator invites - [admin/](mdc:frontend/src/app/features/admin/)
-- **Dealer Dashboard**: Dealer-specific functionality - [dealer/](mdc:frontend/src/app/features/dealer/)
-- **Profile Management**: User profiles and settings - [profile/](mdc:frontend/src/app/features/profile/)
-- **Vehicle Management**: Vehicle listings and management - [vehicle/](mdc:frontend/src/app/features/vehicle/)
+#### 1. Authentication Module ([auth/](mdc:backend/src/auth/))
+- User registration with email verification
+- Login with JWT token generation
+- Password reset functionality
+- Role-based access control (Admin, Dealer, Buyer, Seller, Collaborator)
+- Refresh token mechanism
+- Session management
+- Account activation/deactivation
+- Multi-factor authentication (planned)
+
+#### 2. Auction Module ([auction/](mdc:backend/src/auction/))
+**Core Auction Features**:
+- Auction creation and scheduling
+- Real-time bidding system
+- Auction status management (upcoming, live, ended, cancelled)
+- Reserve price handling
+- Auction timer and countdown
+- Bid validation and increment rules
+- Auto-extension on last-minute bids
+- Auction history and analytics
+
+**Advanced Bidding Tools** (OpenLane-inspired):
+- **Ultimo System**: Final offer bidding after auction ends
+- **Price Barometer**: Real-time market value indicators
+- **Bid Agent**: Automated proxy bidding with maximum bid limits
+- **Bid History**: Complete audit trail of all bids
+- **Bid Retraction**: Controlled bid withdrawal process
+- **Reserve Price Logic**: Minimum acceptable price handling
+- **Buy Now**: Instant purchase option
+
+**Auction Types**:
+- Live timed auctions
+- 24/7 marketplace listings
+- Private treaty sales
+- Scheduled auctions
+
+#### 3. Vehicle Module ([vehicle/](mdc:backend/src/vehicle/))
+- Vehicle listing creation and management
+- Multiple image upload and management
+- Vehicle specifications (make, model, year, mileage, VIN, etc.)
+- Vehicle condition reporting
+- AI-enhanced inspection reports (planned)
+- Vehicle history integration
+- 360-degree imaging support
+- Market value analysis
+- Vehicle categorization and tagging
+- Search and filter capabilities
+
+#### 4. Dealers Module ([dealers/](mdc:backend/src/dealers/))
+- Dealer profile management
+- Dealer verification and KYC
+- Dealer ratings and reviews
+- Inventory management
+- Performance analytics
+- Seller dashboard
+- Commission tracking
+- Volume-based discount tiers
+
+#### 5. Marketplace Module ([marketplace/](mdc:backend/src/marketplace/))
+- 24/7 vehicle marketplace
+- Buy Now functionality
+- Make Offer system
+- Saved searches
+- Search alerts and notifications
+- Featured listings
+- Trending vehicles
+- Recently viewed vehicles
+
+#### 6. Profile Module ([profile/](mdc:backend/src/profile/))
+- User profile management
+- KYC verification system
+- Document upload and verification
+- Profile completion workflow
+- Notification preferences
+- Privacy settings
+- Bidding history
+- Purchase history
+- Saved vehicles/watchlist
+
+#### 7. Admin Module ([admin/](mdc:backend/src/admin/))
+- User management (list, block, delete)
+- Collaborator invitation system
+- Platform analytics and reporting
+- Auction oversight and management
+- Content moderation
+- Fee and commission management
+- System configuration
+- Audit logs
+
+#### 8. Buyer Module ([buyer/](mdc:backend/src/buyer/))
+- Buyer-specific dashboard
+- Bidding activity tracking
+- Won auctions management
+- Payment processing
+- Delivery coordination
+- Buyer preferences
+
+#### 9. Seller Module ([seller/](mdc:backend/src/seller/))
+- Seller dashboard
+- Vehicle listing management
+- Auction performance analytics
+- Sales history
+- Revenue tracking
+- Inventory management
+
+#### 10. Collaborator Module ([collaborator/](mdc:backend/src/collaborator/))
+- Collaborator invitations
+- Team member management
+- Permission delegation
+- Multi-user account access
+- Activity tracking
+
+#### 11. Notification Module ([notification/](mdc:backend/src/notification/))
+- Real-time notifications
+- Email notifications
+- Push notifications (planned)
+- SMS alerts (planned)
+- Notification preferences
+- Auction reminders
+- Bid alerts
+- Outbid notifications
+
+#### 12. Email Module ([email/](mdc:backend/src/email/))
+- Transactional email service
+- Email templates
+- Welcome emails
+- Auction notifications
+- Password reset emails
+- Verification emails
+
+#### 13. Common Module ([common/](mdc:backend/src/common/))
+- Shared utilities and helpers
+- Guards (Auth, Roles)
+- Decorators
+- Interceptors
+- Pipes and validators
+- Constants and enums
+- DTOs and interfaces
+
+### Frontend Features ([frontend/src/app/](mdc:frontend/src/app/))
+
+#### Feature Modules ([features/](mdc:frontend/src/app/features/))
+
+1. **Authentication** ([auth/](mdc:frontend/src/app/features/auth/))
+   - Sign in/Sign up pages
+   - Password reset flow
+   - Email verification
+   - Account activation
+
+2. **Admin Panel** ([admin/](mdc:frontend/src/app/features/admin/))
+   - User management dashboard
+   - Collaborator invitation system
+   - Platform analytics
+   - System configuration
+
+3. **Dealer Dashboard** ([dealer/](mdc:frontend/src/app/features/dealer/))
+   - Dealer-specific functionality
+   - Inventory management
+   - Performance metrics
+   - Sales analytics
+
+4. **Profile Management** ([profile/](mdc:frontend/src/app/features/profile/))
+   - User profile editor
+   - KYC document upload
+   - Settings and preferences
+   - Account security
+
+5. **Vehicle Management** ([vehicle/](mdc:frontend/src/app/features/vehicle/))
+   - Vehicle listing creation
+   - Vehicle details editor
+   - Image gallery management
+   - Vehicle search and filters
+
+6. **Auction Features** (planned)
+   - Live auction interface
+   - Real-time bidding
+   - Auction countdown timers
+   - Bid history display
+   - Ultimo bidding interface
+   - Price Barometer visualization
+   - Bid Agent configuration
+
+7. **Marketplace** (planned)
+   - 24/7 marketplace listings
+   - Buy Now functionality
+   - Make Offer system
+   - Saved searches
+   - Watchlist
+
+#### Core Services ([core/](mdc:frontend/src/app/core/))
+- API integration services
+- Authentication service
+- State management stores
+- HTTP interceptors
+- Error handling
+- Guards and resolvers
+
+#### Shared Components ([shared/](mdc:frontend/src/app/shared/))
+- Reusable UI components
+- Pipes and directives
+- Utility functions
+- Models and interfaces
+
+## User Roles & Permissions
+
+1. **Admin**
+   - Full platform access
+   - User management
+   - Auction oversight
+   - System configuration
+
+2. **Dealer**
+   - Create and manage vehicle listings
+   - Create auctions
+   - View analytics
+   - Manage inventory
+
+3. **Buyer**
+   - Browse vehicles
+   - Place bids
+   - Use Bid Agent
+   - Purchase vehicles
+   - Make offers
+
+4. **Seller**
+   - List vehicles
+   - Set reserve prices
+   - View sales performance
+
+5. **Collaborator**
+   - Limited access based on permissions
+   - Support dealer operations
+   - Manage specific tasks
+
+## Key Business Features
+
+### Revenue Streams
+1. **Commission Fees**: 5-10% on successful auctions
+2. **Listing Fees**: AED 50-500 per premium listing
+3. **Subscription Plans**: Monthly plans for frequent sellers
+4. **Value-Added Services**: Vehicle history reports, market analysis, consulting
+5. **Advertising Revenue**: Banner ads, sponsored listings
+
+### Competitive Fee Structure
+- Transparent pricing with no hidden charges
+- Volume-based discounts
+- Loyalty programs
+- Premium features and placement options
+
+### Inventory Management
+- Thousands of dealer trades
+- Exclusive off-lease vehicles
+- Real-time inventory updates
+- Advanced search and filtering
+
+### Trustworthy Condition Reports
+- AI-enhanced inspections (planned)
+- Blockchain-verified authenticity (planned)
+- As Described Guarantee
+- 360-degree imaging
+- Mechanical diagnostics
+
+### Flexible Buying Options
+- 24/7 marketplace listings
+- Scheduled live auctions
+- Private treaty sales
+- Reserve price options
+- Buy-now pricing
+- Make-offer functionality
+
+### Comprehensive Support
+- 24/7 multilingual support (Arabic, English, Hindi)
+- "My Orders" tracking system
+- Dedicated account managers
+- Training resources and tutorials
 
 ## Key Configuration Files
-- Backend: [package.json](mdc:backend/package.json), [tsconfig.json](mdc:backend/tsconfig.json)
-- Frontend: [package.json](mdc:frontend/package.json), [angular.json](mdc:frontend/angular.json)
-- Docker: [docker-compose.yml](mdc:docker-compose.yml)
+
+- **Backend**: [package.json](mdc:backend/package.json), [tsconfig.json](mdc:backend/tsconfig.json), [trigger.config.ts](mdc:backend/trigger.config.ts)
+- **Frontend**: [package.json](mdc:frontend/package.json), [angular.json](mdc:frontend/angular.json), [tailwind.config.js](mdc:frontend/tailwind.config.js)
+- **Docker**: [docker-compose.yml](mdc:docker-compose.yml)
+- **Environment**: [backend/development-env-example.txt](mdc:backend/development-env-example.txt)
 
 ## Development Standards
+
 - Use modern ES6+ syntax for JavaScript/TypeScript
-- Follow NestJS patterns for backend development
-- Follow Angular best practices for frontend development
-- Use `bun` as the package manager instead of npm
+- Follow NestJS best practices for backend development (see [backend-nestjs](mdc:.cursor/rules/backend-nestjs.mdc))
+- Follow Angular best practices for frontend development (see [frontend-angular](mdc:.cursor/rules/frontend-angular.mdc))
+- Use `bun` as the package manager instead of npm/npx
+- Follow TypeScript strict mode and best practices
+- Use async/await for asynchronous operations
+- Implement proper error handling and logging
+- Write clean, maintainable, and self-documenting code
+- Follow SOLID principles and design patterns
+
+## Scripts & Seeding
+
+### Backend Seed Scripts
+```bash
+bun run seed:users          # Seed users and profiles
+bun run seed:dealers        # Seed dealer profiles
+bun run seed:collaborators  # Seed collaborator profiles
+bun run seed:vehicles       # Seed vehicle listings
+bun run seed:auctions       # Seed auctions
+bun run seed:all           # Seed all data
+```
+
+### Development Commands
+```bash
+# Backend
+cd backend
+bun install
+bun run start:dev          # Start in watch mode
+
+# Frontend
+cd frontend
+bun install
+bun run start              # Start dev server (port 4200)
+bun run build              # Production build
+```
+
+## Integration Points
+
+- **MeiliSearch**: Fast vehicle search and filtering
+- **Trigger.dev**: Background job processing (auction timers, notifications)
+- **Email Service**: Nodemailer for transactional emails
+- **File Storage**: Local file system with Multer (cloud storage planned)
+- **Payment Gateway**: Integration planned (Stripe, PayPal, local UAE gateways)
+- **Blockchain**: Planned for vehicle authenticity verification
+- **AR Preview**: Planned for 3D vehicle visualization
+
+## Project Goals & Roadmap
+
+**Year 1 Targets**:
+- 10,000 Monthly Active Users
+- AED 2M Gross Merchandise Value by Year 2
+- 99.99% Platform Uptime
+
+**Phase 1**: Foundation & Core Infrastructure ✅
+**Phase 2**: User Management & Profiles ✅
+**Phase 3**: Vehicle Marketplace (In Progress)
+**Phase 4**: Advanced Auction System (In Progress)
+**Phase 5**: Support & Mobile Optimization (Planned)
+**Phase 6**: Testing & Deployment (Planned)
+
+## References
+
+- Business Plan: [bussines_plan.md](mdc:bussines_plan.md)
+- Implementation Plan: [README.md](mdc:README.md)
+- Seed Data: [backend/seed-data/](mdc:backend/seed-data/)
+- Mock Images: [mockImages/](mdc:mockImages/)
